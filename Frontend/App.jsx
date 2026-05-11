@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login  from "./pages/Login";
-import Upload from "./pages/Upload";
-import Chat   from "./pages/Chat";
+import Login  from "./src/pages/Login";
+import Upload from "./src/pages/Upload";
+import Chat   from "./src/pages/Chat";
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem("token");

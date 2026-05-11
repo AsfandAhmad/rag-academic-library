@@ -41,9 +41,15 @@ class UserOut(BaseModel):
 
 # ─── Helpers ──────────────────────────────────────────────
 def hash_password(password: str) -> str:
+    # Bcrypt has a 72-byte limit, truncate if necessary
+    if len(password.encode('utf-8')) > 72:
+        password = password[:72]
     return pwd_context.hash(password)
 
 def verify_password(plain: str, hashed: str) -> bool:
+    # Bcrypt has a 72-byte limit, truncate if necessary
+    if len(plain.encode('utf-8')) > 72:
+        plain = plain[:72]
     return pwd_context.verify(plain, hashed)
 
 def create_token(data: dict) -> str:

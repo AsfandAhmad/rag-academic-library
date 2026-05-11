@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RAG Library - Academic Research Assistant</title>
+    <script>
+      // Filter out Grammarly and other browser extension console noise
+      (function() {
+        const originalError = console.error;
+        console.error = function(...args) {
+          // Filter out Grammarly errors
+          if (args[0] && typeof args[0] === 'string' && 
+              (args[0].includes('grm ERROR') || 
+               args[0].includes('Grammarly') ||
+               args[0].includes('[iterable]') ||
+               args[0].includes('Not supported: in app messages'))) {
+            return;
+          }
+          originalError.apply(console, args);
+        };
+      })();
+    </script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      
+      #root {
+        width: 100%;
+        height: 100vh;
+      }
+      
+      @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/main.jsx"></script>
+  </body>
+</html>

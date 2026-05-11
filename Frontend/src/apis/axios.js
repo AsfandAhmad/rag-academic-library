@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
   headers: { "Content-Type": "application/json" },
 });
 
@@ -32,7 +32,7 @@ export const loginUser     = (email, password) => {
   form.append("username", email);
   form.append("password", password);
   return axios.post(
-    `${process.env.REACT_APP_API_URL || "http://localhost:8000"}/auth/login`,
+    `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/auth/login`,
     form,
     { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
   );

@@ -2,15 +2,23 @@ from groq import Groq
 from typing import List, Dict
 import os
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL   = os.getenv("GROQ_MODEL", "llama3-8b-8192")
-
 class Generator:
     _instance = None
 
     def __init__(self):
-        self.client = Groq(api_key=GROQ_API_KEY)
-        print(f"✅ Groq client ready — model: {GROQ_MODEL}")
+        # Load environment variables at runtime, not at import time
+        self.api_key = os.getenv("GROQ_API_KEY")
+        self.model = os.getenv("GROQ_MODEL", "llama3-8b-8192")
+        
+        if not self.api_key:
+            raise ValueError("GROQ_API_KEY not found in environment variables")
+        
+        try:
+            self.client = Groq(api_key=self.api_key)
+            print(f"✅ Groq client ready — model: {self.model}")
+        except Exception as e:
+            print(f"❌ Groq initialization failed: {e}")
+            raise
 
     @classmethod
     def get_instance(cls):
@@ -62,41 +70,45 @@ ANSWER:"""
         Returns:
             dict with 'answer' and 'sources' keys
         """
-        prompt = self.build_prompt(query, chunks)
+        try:
+            prompt = self.build_prompt(query, chunks)
 
-        response = self.client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful academic library assistant. Always cite sources."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.2,    # low temp for factual accuracy
-            max_tokens=1024,
-        )
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful academic library assistant. Always cite sources."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.2,    # low temp for factual accuracy
+                max_tokens=1024,
+            )
 
-        answer = response.choices[0].message.content
+            answer = response.choices[0].message.content
 
-        # Build sources list for frontend
-        sources = []
-        for i, chunk in enumerate(chunks, 1):
-            sources.append({
-                "index":    i,
-                "filename": chunk["filename"],
-                "page":     chunk["page"],
-                "score":    round(chunk.get("rerank_score", chunk.get("score", 0)), 4),
-                "excerpt":  chunk["text"][:200] + "..."  # first 200 chars
-            })
+            # Build sources list for frontend
+            sources = []
+            for i, chunk in enumerate(chunks, 1):
+                sources.append({
+                    "index":    i,
+                    "filename": chunk["filename"],
+                    "page":     chunk["page"],
+                    "score":    round(chunk.get("rerank_score", chunk.get("score", 0)), 4),
+                    "excerpt":  chunk["text"][:200] + "..."  # first 200 chars
+                })
 
-        return {
-            "answer":  answer,
-            "sources": sources
-        }
+            return {
+                "answer":  answer,
+                "sources": sources
+            }
+        except Exception as e:
+            print(f"❌ Generation failed: {e}")
+            raise
 
 
 def get_generator() -> Generator:
