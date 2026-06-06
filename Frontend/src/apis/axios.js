@@ -171,6 +171,17 @@ export const askQuestion = (question) =>
 export const getHistory = () =>
   API.get("/query/history");
 
+export const deleteHistoryItem = (id) => {
+  if (id === undefined || id === null) {
+    throw new Error("Missing chat history ID");
+  }
+
+  return API.delete(`/query/history/${encodeURIComponent(id)}`);
+};
+
+export const clearHistory = () =>
+  API.delete("/query/history");
+
 // ─────────────────────────────────────────────
 // FEEDBACK
 // ─────────────────────────────────────────────

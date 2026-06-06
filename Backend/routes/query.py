@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete, desc, select
 from pydantic import BaseModel
 from typing import Optional
 
@@ -89,7 +90,6 @@ async def get_query_history(
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db)
 ):
-    from sqlalchemy import select, desc
     result = await db.execute(
         select(QueryLog)
         .where(QueryLog.user_id == current_user.id)
@@ -107,3 +107,34 @@ async def get_query_history(
         }
         for l in logs
     ]
+
+
+@router.delete("/history/{query_id}")
+async def delete_query_history_item(
+    query_id:      int,
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(QueryLog).where(
+            QueryLog.id == query_id,
+            QueryLog.user_id == current_user.id
+        )
+    )
+    log = result.scalar_one_or_none()
+    if not log:
+        raise HTTPException(status_code=404, detail="Chat history item not found")
+
+    await db.delete(log)
+    await db.commit()
+    return {"message": "Chat history item deleted successfully"}
+
+
+@router.delete("/history")
+async def clear_query_history(
+    current_user: User = Depends(get_current_user),
+    db:           AsyncSession = Depends(get_db)
+):
+    await db.execute(delete(QueryLog).where(QueryLog.user_id == current_user.id))
+    await db.commit()
+    return {"message": "Chat history cleared successfully"}

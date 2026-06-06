@@ -11,11 +11,13 @@
   width: 100vw;
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: #0a0500;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 24px 16px;
   font-family: 'Lato', sans-serif;
 }
 
@@ -762,11 +764,34 @@
 
 /* Responsive */
 @media (max-width: 480px) {
+  .login-container,
+  .login-scene {
+    align-items: flex-start;
+    padding: 18px 12px;
+  }
+
   .login-card {
-    width: 90%;
+    width: 100%;
     max-width: 360px;
-    padding: 32px 28px;
-    transform: rotateY(0deg) rotateX(0deg);
+    padding: 28px 22px;
+    transform: none !important;
+  }
+
+  .card-face-left,
+  .card-face-bottom,
+  .card-edge-left,
+  .card-edge-bottom {
+    display: none;
+  }
+
+  .brand-title,
+  .login-title {
+    font-size: 20px;
+  }
+
+  .brand-subtitle,
+  .login-subtitle {
+    letter-spacing: 2px;
   }
 
   .input-row,

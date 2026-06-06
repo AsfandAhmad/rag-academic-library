@@ -167,6 +167,11 @@ export default function Chat() {
           setInput={setInput}
           onSend={handleSend}
           isLoading={loading}
+          onClear={() => {
+            setMessages([]);
+            setSources([]);
+          }}
+          onClearSelectedDoc={() => setSelectedDoc(null)}
         />
         <SourcePanel sources={sources} />
       </div>

@@ -1,38 +1,98 @@
 import React, { useEffect, useState } from 'react';
 import { getMe } from '../apis/axios';
+import Navbar from '../components/Navbar';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Settings(){
   const [user, setUser] = useState(null);
+  const {
+    theme,
+    toggleTheme,
+    textScale,
+    increaseText,
+    decreaseText,
+    highContrast,
+    setHighContrast,
+    resetAccessibility,
+  } = useTheme();
 
   useEffect(()=>{ (async ()=>{
     try{ const res = await getMe(); setUser(res.data); }catch(e){ setUser(null); }
   })(); },[]);
 
   return (
-    <div style={{padding:24}}>
-      <h1 style={{color:'var(--text-primary)'}}>Settings</h1>
-      <div style={{marginTop:12}} className="card">
-        <h3 style={{margin:0,color:'var(--text-secondary)'}}>Profile</h3>
-        {user ? (
-          <div style={{marginTop:8}}>
-            <div><strong style={{color:'var(--text-primary)'}}>Name:</strong> <span style={{color:'var(--text-secondary)'}}>{user.name}</span></div>
-            <div><strong style={{color:'var(--text-primary)'}}>Email:</strong> <span style={{color:'var(--text-secondary)'}}>{user.email}</span></div>
-            <div><strong style={{color:'var(--text-primary)'}}>Role:</strong> <span style={{color:'var(--text-secondary)'}}>{user.role}</span></div>
+    <>
+      <Navbar />
+      <div className="page-container">
+        <div className="page-header">
+          <div className="page-header-row">
+            <div>
+              <h1 className="page-title">Settings</h1>
+              <p className="page-description">Manage your profile and reading preferences</p>
+            </div>
           </div>
-        ) : (
-          <div style={{color:'var(--text-tertiary)'}}>Not signed in.</div>
-        )}
-      </div>
+        </div>
 
-      <div style={{marginTop:16}} className="card">
-        <h3 style={{margin:0,color:'var(--text-secondary)'}}>Accessibility</h3>
-        <div style={{marginTop:8,color:'var(--text-secondary)'}}>Adjust text size and contrast for comfortable reading.</div>
-        <div style={{marginTop:12,display:'flex',gap:8}}>
-          <button className="btn-outline">Increase text</button>
-          <button className="btn-outline">Decrease text</button>
-          <button className="btn-outline">Toggle high contrast</button>
+        <div className="page-content settings-content">
+          <section className="settings-card">
+            <h2 className="settings-card-title">Profile</h2>
+            {user ? (
+              <div className="profile-list">
+                <div><strong>Name:</strong> <span>{user.name}</span></div>
+                <div><strong>Email:</strong> <span>{user.email}</span></div>
+                <div><strong>Role:</strong> <span>{user.role}</span></div>
+              </div>
+            ) : (
+              <div className="empty-state compact">Not signed in.</div>
+            )}
+          </section>
+
+          <section className="settings-card">
+            <h2 className="settings-card-title">Accessibility</h2>
+            <p className="settings-copy">Adjust text size and contrast for comfortable reading.</p>
+            <div className="settings-status-grid">
+              <div>
+                <span>Text size</span>
+                <strong>{textScale === 0 ? 'Default' : textScale > 0 ? `+${textScale}` : textScale}</strong>
+              </div>
+              <div>
+                <span>Contrast</span>
+                <strong>{highContrast ? 'High' : 'Standard'}</strong>
+              </div>
+            </div>
+            <div className="settings-actions">
+              <button className="btn-secondary" onClick={increaseText} disabled={textScale >= 2}>
+                Increase text
+              </button>
+              <button className="btn-secondary" onClick={decreaseText} disabled={textScale <= -1}>
+                Decrease text
+              </button>
+              <button className="btn-secondary" onClick={() => setHighContrast(!highContrast)}>
+                {highContrast ? 'Standard contrast' : 'High contrast'}
+              </button>
+            </div>
+          </section>
+
+          <section className="settings-card">
+            <h2 className="settings-card-title">Appearance</h2>
+            <p className="settings-copy">Switch between the dark archive theme and a lighter reading theme.</p>
+            <div className="settings-status-grid">
+              <div>
+                <span>Theme</span>
+                <strong>{theme === 'light' ? 'Light' : 'Dark'}</strong>
+              </div>
+            </div>
+            <div className="settings-actions">
+              <button className="btn-secondary" onClick={toggleTheme}>
+                {theme === 'light' ? 'Use dark theme' : 'Use light theme'}
+              </button>
+              <button className="btn-secondary" onClick={resetAccessibility}>
+                Reset accessibility
+              </button>
+            </div>
+          </section>
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,8 +1,23 @@
 import { useNavigate, NavLink } from 'react-router-dom';
 
+const getStoredUser = () => {
+  try {
+    const storedUser = localStorage.getItem('user');
+    return storedUser ? JSON.parse(storedUser) : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function Navbar() {
   const navigate = useNavigate();
-  const user = localStorage.getItem('username') || localStorage.getItem('email') || 'User';
+  const parsedUser = getStoredUser();
+  const user =
+    localStorage.getItem('username') ||
+    localStorage.getItem('email') ||
+    parsedUser?.name ||
+    parsedUser?.email ||
+    'User';
 
   const handleSignOut = () => {
     localStorage.removeItem('token');
@@ -39,6 +54,7 @@ export default function Navbar() {
 
       {/* Nav links */}
       <div className="navbar-links">
+        <NavLink to="/dashboard" className={({ isActive }) => 'navbar-link' + (isActive ? ' active' : '')}>Dashboard</NavLink>
         <NavLink to="/chat"     className={({ isActive }) => 'navbar-link' + (isActive ? ' active' : '')}>Chat</NavLink>
         <NavLink to="/library"  className={({ isActive }) => 'navbar-link' + (isActive ? ' active' : '')}>Library</NavLink>
         <NavLink to="/saved"    className={({ isActive }) => 'navbar-link' + (isActive ? ' active' : '')}>Saved</NavLink>

@@ -6,7 +6,9 @@ export default function ChatBox({
   input, 
   setInput, 
   onSend, 
-  isLoading 
+  isLoading,
+  onClear,
+  onClearSelectedDoc,
 }) {
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
@@ -44,7 +46,9 @@ export default function ChatBox({
           <p className="chat-subtitle">Ask questions about your documents</p>
         </div>
         <div className="chat-actions">
-          <button className="btn-secondary">Clear Chat</button>
+          <button className="btn-secondary" onClick={onClear} disabled={messages.length === 0}>
+            Clear Chat
+          </button>
         </div>
       </div>
 
@@ -111,7 +115,9 @@ export default function ChatBox({
           <span className="context-text">
             Asking about: <strong>{selectedDoc.filename}</strong>
           </span>
-          <button className="context-clear">×</button>
+          <button className="context-clear" onClick={onClearSelectedDoc} aria-label="Clear selected document">
+            x
+          </button>
         </div>
       )}
 

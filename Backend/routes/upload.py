@@ -18,6 +18,7 @@ router = APIRouter()
 
 CHUNK_SIZE    = 500
 CHUNK_OVERLAP = 50
+UPLOAD_INDEX_TIMEOUT_SECONDS = int(os.getenv("UPLOAD_INDEX_TIMEOUT_SECONDS", "600"))
 
 STORAGE_DIR = Path(__file__).resolve().parents[1] / "storage"
 STORAGE_DIR.mkdir(exist_ok=True)
@@ -208,6 +209,11 @@ async def get_all_docs(
             "filename":   d.filename,
             "uploaded_at": d.uploaded_at.isoformat(),
             "uploaded_by": users.get(d.user_id, "Unknown"),
+            "category":    d.category,
+            "description": d.description,
+            "chunk_count": d.chunk_count,
+            "downloads":   d.downloads,
+            "read_count":  d.read_count,
             "can_delete": (current_user.role.value in ("admin", "faculty")) or (current_user.id == d.user_id)
         }
         for d in docs
@@ -220,15 +226,12 @@ async def delete_doc_by_id(
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(
-        select(UploadedDoc).where(
-            UploadedDoc.id == doc_id,
-            UploadedDoc.user_id == current_user.id
-        )
-    )
+    result = await db.execute(select(UploadedDoc).where(UploadedDoc.id == doc_id))
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    if current_user.role.value not in ("admin", "faculty") and doc.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this document")
 
     ids = json.loads(doc.pinecone_ids or "[]")
     if ids:
