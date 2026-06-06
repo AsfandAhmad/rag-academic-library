@@ -2,10 +2,12 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
+import asyncio
 import PyPDF2
 import uuid
 import json
 import io
+import os
 from pathlib import Path
 
 from db.database import get_db, UploadedDoc, FavoriteDoc
@@ -16,9 +18,35 @@ router = APIRouter()
 
 CHUNK_SIZE    = 500    # words per chunk
 CHUNK_OVERLAP = 50     # overlapping words between chunks
+UPLOAD_INDEX_TIMEOUT_SECONDS = int(os.getenv("UPLOAD_INDEX_TIMEOUT_SECONDS", "300"))
 
 STORAGE_DIR = Path(__file__).resolve().parents[1] / "storage"
 STORAGE_DIR.mkdir(exist_ok=True)
+
+
+async def run_blocking_upload_step(label: str, func, *args):
+    """Run slow upload work outside FastAPI's event loop with a clear timeout."""
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(func, *args),
+            timeout=UPLOAD_INDEX_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                f"Upload timed out while {label}. "
+                "Check backend logs, Pinecone connectivity, and the SciBERT model setup."
+            ),
+        ) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"Upload failed while {label}: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Upload failed while {label}: {exc}",
+        ) from exc
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> list[dict]:
@@ -45,6 +73,30 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     return chunks
 
 
+def build_chunks(filename: str, pages: list[dict], user_id: int) -> list[dict]:
+    chunks_to_embed = []
+    for page_data in pages:
+        page_chunks = chunk_text(page_data["text"])
+        for idx, chunk_text_content in enumerate(page_chunks):
+            chunk_id = f"{filename}_{page_data['page']}_{idx}_{uuid.uuid4().hex[:8]}"
+            chunks_to_embed.append({
+                "id":   chunk_id,
+                "text": chunk_text_content,
+                "metadata": {
+                    "filename": filename,
+                    "page":     page_data["page"],
+                    "chunk":    idx,
+                    "user_id":  user_id,
+                }
+            })
+    return chunks_to_embed
+
+
+def write_uploaded_file(path: Path, file_bytes: bytes):
+    with open(path, "wb") as f:
+        f.write(file_bytes)
+
+
 @router.post("/pdf")
 async def upload_pdf(
     file:         UploadFile = File(...),
@@ -57,7 +109,9 @@ async def upload_pdf(
     Upload a PDF → extract text → chunk → embed → store in Pinecone.
     Accessible by all authenticated users.
     """
-    if not file.filename.endswith(".pdf"):
+    print(f"Upload started: {file.filename} for user {current_user.id}")
+
+    if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
 
     file_bytes = await file.read()
@@ -65,36 +119,47 @@ async def upload_pdf(
         raise HTTPException(status_code=400, detail="File too large (max 20MB)")
 
     # 1. Extract text per page
-    pages = extract_text_from_pdf(file_bytes)
+    pages = await run_blocking_upload_step(
+        "extracting text from the PDF",
+        extract_text_from_pdf,
+        file_bytes,
+    )
     if not pages:
         raise HTTPException(status_code=400, detail="Could not extract text from PDF")
+    print(f"Upload text extracted: {file.filename}, pages={len(pages)}")
 
     # 2. Chunk each page
-    chunks_to_embed = []
-    for page_data in pages:
-        page_chunks = chunk_text(page_data["text"])
-        for idx, chunk_text_content in enumerate(page_chunks):
-            chunk_id = f"{file.filename}_{page_data['page']}_{idx}_{uuid.uuid4().hex[:8]}"
-            chunks_to_embed.append({
-                "id":   chunk_id,
-                "text": chunk_text_content,
-                "metadata": {
-                    "filename": file.filename,
-                    "page":     page_data["page"],
-                    "chunk":    idx,
-                    "user_id":  current_user.id,
-                }
-            })
+    chunks_to_embed = await run_blocking_upload_step(
+        "chunking extracted text",
+        build_chunks,
+        file.filename,
+        pages,
+        current_user.id,
+    )
+    print(f"Upload chunks built: {file.filename}, chunks={len(chunks_to_embed)}")
 
     # 3. Embed + upsert to Pinecone
-    retriever  = get_retriever()
-    stored_ids = retriever.upsert_chunks(chunks_to_embed)
+    retriever = await run_blocking_upload_step(
+        "connecting to Pinecone and loading the embedding model",
+        get_retriever,
+    )
+    print(f"Upload indexing started: {file.filename}")
+    stored_ids = await run_blocking_upload_step(
+        "embedding and indexing the PDF",
+        retriever.upsert_chunks,
+        chunks_to_embed,
+    )
+    print(f"Upload indexing finished: {file.filename}, vectors={len(stored_ids)}")
 
     # 4. Save record to SQLite and store file
     stored_name = f"{uuid.uuid4().hex}_{file.filename}"
     stored_path = STORAGE_DIR / stored_name
-    with open(stored_path, "wb") as f:
-        f.write(file_bytes)
+    await run_blocking_upload_step(
+        "saving the uploaded PDF",
+        write_uploaded_file,
+        stored_path,
+        file_bytes,
+    )
 
     preview_text = ""
     if chunks_to_embed:

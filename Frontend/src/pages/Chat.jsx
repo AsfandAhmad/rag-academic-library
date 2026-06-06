@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { askQuestion, uploadPDF, getAllDocs, deleteDocById } from "../apis/axios";
+import { askQuestion, uploadPDFWithProgress, getAllDocs } from "../apis/axios";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import ChatBox from "../components/ChatBox";
@@ -12,6 +12,7 @@ export default function Chat() {
   const [sources, setSources] = useState([]);
   const [docs, setDocs] = useState([]);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [uploadStatus, setUploadStatus] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -23,9 +24,12 @@ export default function Chat() {
   const fetchDocs = async () => {
     try {
       const res = await getAllDocs();
-      setDocs(res.data || []);
+      const nextDocs = res.data || [];
+      setDocs(nextDocs);
+      return nextDocs;
     } catch (e) {
       setDocs([]);
+      return [];
     }
   };
 
@@ -65,13 +69,83 @@ export default function Chat() {
       return;
     }
 
+    setUploadStatus({
+      fileName: file.name,
+      progress: 0,
+      state: "uploading",
+      message: "Starting upload",
+    });
+
+    let uploadWatchdog;
+
     try {
-      await uploadPDF(file);
-      await fetchDocs();
-      alert(`Uploaded: ${file.name}`);
+      console.info("Uploading PDF:", file.name);
+      uploadWatchdog = window.setTimeout(() => {
+        setUploadStatus((current) => {
+          if (!current || current.progress > 0) return current;
+
+          return {
+            ...current,
+            message: "Waiting for backend to accept the file",
+          };
+        });
+      }, 4000);
+
+      const res = await uploadPDFWithProgress(file, (progress) => {
+        setUploadStatus((current) => ({
+          fileName: current?.fileName || file.name,
+          progress,
+          state: progress >= 100 ? "processing" : "uploading",
+          message:
+            progress >= 100
+              ? "File uploaded; indexing document"
+              : `${progress}% uploaded`,
+        }));
+      });
+
+      window.clearTimeout(uploadWatchdog);
+      setUploadStatus({
+        fileName: file.name,
+        progress: 100,
+        state: "processing",
+        message: "Indexing document",
+      });
+
+      const nextDocs = await fetchDocs();
+      const uploadedDoc = nextDocs.find(
+        (doc) => doc.id === res.data.document_id
+      );
+      setSelectedDoc(
+        uploadedDoc || {
+          id: res.data.document_id,
+          filename: res.data.filename || file.name,
+        }
+      );
+      setUploadStatus({
+        fileName: res.data.filename || file.name,
+        progress: 100,
+        state: "complete",
+        message: `${res.data.chunks || 0} chunks indexed`,
+      });
+
+      window.setTimeout(() => {
+        setUploadStatus((current) =>
+          current?.fileName === (res.data.filename || file.name) ? null : current
+        );
+      }, 3500);
     } catch (err) {
+      window.clearTimeout(uploadWatchdog);
       console.error(err);
-      alert('Upload failed');
+      const message =
+        err.response?.data?.detail ||
+        err.message ||
+        "Upload failed";
+      setUploadStatus({
+        fileName: file.name,
+        progress: 0,
+        state: "error",
+        message,
+      });
     }
   };
 
@@ -84,6 +158,7 @@ export default function Chat() {
           selectedDoc={selectedDoc}
           setSelectedDoc={setSelectedDoc}
           onUpload={handleUpload}
+          uploadStatus={uploadStatus}
         />
         <ChatBox 
           selectedDoc={selectedDoc}

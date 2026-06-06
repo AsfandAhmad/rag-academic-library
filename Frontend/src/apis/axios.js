@@ -120,14 +120,16 @@ export const uploadPDFWithProgress = (
     headers: {
       "Content-Type": "multipart/form-data",
     },
+    timeout: 10 * 60 * 1000,
     onUploadProgress: (progressEvent) => {
-      if (onProgress && progressEvent.total) {
+      const total = progressEvent.total || file.size;
+      if (onProgress && total) {
         const percent = Math.round(
           (progressEvent.loaded * 100) /
-            progressEvent.total
+            total
         );
 
-        onProgress(percent);
+        onProgress(Math.min(percent, 100));
       }
     },
   });

@@ -77,7 +77,7 @@ export default function Upload() {
       </aside>
 
       <main className="upload-main">
-        <h1 style={{fontFamily:'Georgia,serif',color:'#d4a030'}}>Upload Manuscripts</h1>
+        <h1 style={{fontFamily:'Georgia,serif',color:'#d4a030',marginTop:0,marginBottom:24}}>Upload Manuscripts</h1>
 
         {/* Drop Zone */}
         <div
@@ -107,8 +107,8 @@ export default function Upload() {
           )}
         </div>
 
-        <div style={{marginBottom:16}}>
-          <label style={{display:'block',fontSize:11,color:'#8a5a18',marginBottom:6}}>Category (optional)</label>
+        <div style={{marginBottom:24}}>
+          <label style={{display:'block',fontSize:11,color:'#8a5a18',marginBottom:8,fontWeight:500}}>Category (optional)</label>
           <input className="bayt-input" value={category} onChange={(e)=>setCategory(e.target.value)} placeholder="e.g., Sciences" />
         </div>
 
@@ -120,11 +120,11 @@ export default function Upload() {
         )}
 
         {/* Uploaded Docs */}
-        <h2 style={{fontFamily:'Georgia,serif',color:'#d4a030'}}>My Documents ({docs.length})</h2>
+        <h2 style={{fontFamily:'Georgia,serif',color:'#d4a030',marginTop:32,marginBottom:16}}>My Documents ({docs.length})</h2>
         {docs.length === 0 ? (
           <p style={{color:'#8a5a18'}}>No documents uploaded yet. Upload your first PDF above!</p>
         ) : (
-          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
             {docs.map((doc) => (
               <div key={doc.id} className="upload-doc">
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
