@@ -14,8 +14,8 @@ from routes.auth import get_current_user, User
 
 router = APIRouter()
 
-CHUNK_SIZE    = 500    # words per chunk
-CHUNK_OVERLAP = 50     # overlapping words between chunks
+CHUNK_SIZE    = 500
+CHUNK_OVERLAP = 50
 
 STORAGE_DIR = Path(__file__).resolve().parents[1] / "storage"
 STORAGE_DIR.mkdir(exist_ok=True)
@@ -38,7 +38,7 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     chunks = []
     start  = 0
     while start < len(words):
-        end = start + chunk_size
+        end   = start + chunk_size
         chunk = " ".join(words[start:end])
         chunks.append(chunk)
         start += chunk_size - overlap
@@ -53,23 +53,17 @@ async def upload_pdf(
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db)
 ):
-    """
-    Upload a PDF → extract text → chunk → embed → store in Pinecone.
-    Accessible by all authenticated users.
-    """
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
 
     file_bytes = await file.read()
-    if len(file_bytes) > 20 * 1024 * 1024:  # 20MB limit
+    if len(file_bytes) > 20 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large (max 20MB)")
 
-    # 1. Extract text per page
     pages = extract_text_from_pdf(file_bytes)
     if not pages:
         raise HTTPException(status_code=400, detail="Could not extract text from PDF")
 
-    # 2. Chunk each page
     chunks_to_embed = []
     for page_data in pages:
         page_chunks = chunk_text(page_data["text"])
@@ -82,15 +76,13 @@ async def upload_pdf(
                     "filename": file.filename,
                     "page":     page_data["page"],
                     "chunk":    idx,
-                    "user_id":  current_user.id,
+                    "user_id":  int(current_user.id),   # ← force integer explicitly
                 }
             })
 
-    # 3. Embed + upsert to Pinecone
     retriever  = get_retriever()
     stored_ids = retriever.upsert_chunks(chunks_to_embed)
 
-    # 4. Save record to SQLite and store file
     stored_name = f"{uuid.uuid4().hex}_{file.filename}"
     stored_path = STORAGE_DIR / stored_name
     with open(stored_path, "wb") as f:
@@ -128,7 +120,6 @@ async def get_docs(
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db)
 ):
-    """Return a lightweight list of uploaded docs for the current user."""
     result = await db.execute(
         select(UploadedDoc).where(UploadedDoc.user_id == current_user.id)
     )
@@ -144,12 +135,9 @@ async def get_all_docs(
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db)
 ):
-    """Return a list of all uploaded docs (for Library view)."""
-    from sqlalchemy import select
     result = await db.execute(select(UploadedDoc))
     docs = result.scalars().all()
 
-    # fetch uploader names
     user_ids = {d.user_id for d in docs}
     users = {}
     if user_ids:
@@ -160,8 +148,8 @@ async def get_all_docs(
 
     return [
         {
-            "id": d.id,
-            "filename": d.filename,
+            "id":         d.id,
+            "filename":   d.filename,
             "uploaded_at": d.uploaded_at.isoformat(),
             "uploaded_by": users.get(d.user_id, "Unknown"),
             "can_delete": (current_user.role.value in ("admin", "faculty")) or (current_user.id == d.user_id)
@@ -176,7 +164,6 @@ async def delete_doc_by_id(
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db)
 ):
-    """Delete a document (alternative path) — mirrors `/upload/{doc_id}` logic."""
     result = await db.execute(
         select(UploadedDoc).where(
             UploadedDoc.id == doc_id,
@@ -187,23 +174,18 @@ async def delete_doc_by_id(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Delete from Pinecone
     ids = json.loads(doc.pinecone_ids or "[]")
     if ids:
         retriever = get_retriever()
         retriever.delete_by_ids(ids)
 
-    # Remove stored file if present
     if doc.stored_path:
         try:
             Path(doc.stored_path).unlink(missing_ok=True)
         except Exception:
             pass
 
-    # Remove favorites for this doc
     await db.execute(delete(FavoriteDoc).where(FavoriteDoc.doc_id == doc.id))
-
-    # Delete from SQLite
     await db.delete(doc)
     await db.commit()
 
@@ -215,7 +197,6 @@ async def get_my_docs(
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db)
 ):
-    """Get all documents uploaded by the current user."""
     result = await db.execute(
         select(UploadedDoc).where(UploadedDoc.user_id == current_user.id)
     )
@@ -225,6 +206,7 @@ async def get_my_docs(
         select(FavoriteDoc.doc_id).where(FavoriteDoc.user_id == current_user.id)
     )
     fav_ids = {row[0] for row in fav_result.fetchall()}
+
     return [
         {
             "id":          d.id,
@@ -254,7 +236,7 @@ async def get_stats(
     total_chunks = sum(d.chunk_count or 0 for d in docs)
     last_indexed = max((d.uploaded_at for d in docs), default=None)
     return {
-        "total_docs": len(docs),
+        "total_docs":   len(docs),
         "total_chunks": total_chunks,
         "last_indexed": last_indexed.isoformat() if last_indexed else None
     }
@@ -262,9 +244,9 @@ async def get_stats(
 
 @router.get("/{doc_id}/preview")
 async def get_doc_preview(
-    doc_id: int,
+    doc_id:       int,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db:           AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
         select(UploadedDoc).where(
@@ -284,9 +266,9 @@ async def get_doc_preview(
 
 @router.get("/{doc_id}/download")
 async def download_doc(
-    doc_id: int,
+    doc_id:       int,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db:           AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
         select(UploadedDoc).where(
@@ -306,11 +288,10 @@ async def download_doc(
 
 @router.get("/docs/{doc_id}/download")
 async def download_doc_public(
-    doc_id: int,
+    doc_id:       int,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db:           AsyncSession = Depends(get_db)
 ):
-    """Public download endpoint used by Library page (requires authentication)."""
     result = await db.execute(
         select(UploadedDoc).where(UploadedDoc.id == doc_id)
     )
@@ -325,9 +306,9 @@ async def download_doc_public(
 
 @router.post("/{doc_id}/favorite")
 async def toggle_favorite(
-    doc_id: int,
+    doc_id:       int,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db:           AsyncSession = Depends(get_db)
 ):
     existing = await db.execute(
         select(FavoriteDoc).where(
@@ -353,7 +334,6 @@ async def delete_doc(
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db)
 ):
-    """Delete a document and remove its vectors from Pinecone."""
     result = await db.execute(
         select(UploadedDoc).where(
             UploadedDoc.id == doc_id,
@@ -364,23 +344,18 @@ async def delete_doc(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Delete from Pinecone
     ids = json.loads(doc.pinecone_ids or "[]")
     if ids:
         retriever = get_retriever()
         retriever.delete_by_ids(ids)
 
-    # Remove stored file if present
     if doc.stored_path:
         try:
             Path(doc.stored_path).unlink(missing_ok=True)
         except Exception:
             pass
 
-    # Remove favorites for this doc
     await db.execute(delete(FavoriteDoc).where(FavoriteDoc.doc_id == doc.id))
-
-    # Delete from SQLite
     await db.delete(doc)
     await db.commit()
 

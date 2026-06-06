@@ -1,29 +1,28 @@
 from pinecone import Pinecone, ServerlessSpec
 from core.embedder import get_embedder
-from typing import List, Dict
+from typing import List, Dict, Optional
 import os
 import time
 
-DIMENSION = 768   # SciBERT dimension
+DIMENSION = 768
 
 
 class Retriever:
     _instance = None
 
     def __init__(self):
-        # Load environment variables at runtime, not at import time
-        self.api_key = os.getenv("PINECONE_API_KEY")
+        self.api_key    = os.getenv("PINECONE_API_KEY")
         self.index_name = os.getenv("PINECONE_INDEX_NAME", "rag-library")
-        self.region = os.getenv("PINECONE_REGION", "us-east-1")
-        
+        self.region     = os.getenv("PINECONE_REGION", "us-east-1")
+
         if not self.api_key:
             raise ValueError("PINECONE_API_KEY not found in environment variables")
-        
+
         print("🔄 Connecting to Pinecone...")
         try:
             self.pc = Pinecone(api_key=self.api_key)
             self._ensure_index()
-            self.index = self.pc.Index(self.index_name)
+            self.index    = self.pc.Index(self.index_name)
             self.embedder = get_embedder()
             print("✅ Pinecone connected")
         except Exception as e:
@@ -31,7 +30,6 @@ class Retriever:
             raise
 
     def _ensure_index(self):
-        """Create index if it doesn't exist."""
         try:
             existing = [i.name for i in self.pc.list_indexes()]
             if self.index_name not in existing:
@@ -42,7 +40,6 @@ class Retriever:
                     metric="cosine",
                     spec=ServerlessSpec(cloud="aws", region=self.region)
                 )
-                # Wait for index to be ready
                 time.sleep(5)
         except Exception as e:
             print(f"❌ Index creation failed: {e}")
@@ -55,29 +52,24 @@ class Retriever:
         return cls._instance
 
     def upsert_chunks(self, chunks: List[Dict]) -> List[str]:
-        """
-        Store embedded chunks in Pinecone.
-        chunks = [{"id": str, "text": str, "metadata": dict}]
-        Returns list of vector IDs stored.
-        """
         try:
-            texts = [c["text"] for c in chunks]
+            texts      = [c["text"] for c in chunks]
             embeddings = self.embedder.embed_batch(texts)
 
             vectors = []
-            ids = []
+            ids     = []
             for chunk, embedding in zip(chunks, embeddings):
                 vectors.append({
                     "id":       chunk["id"],
                     "values":   embedding,
                     "metadata": {
                         **chunk["metadata"],
-                        "text": chunk["text"]   # store raw text in metadata
+                        "text":    chunk["text"],
+                        "user_id": int(chunk["metadata"]["user_id"])  # ← always integer
                     }
                 })
                 ids.append(chunk["id"])
 
-            # Upsert in batches of 100 (Pinecone limit)
             batch_size = 100
             for i in range(0, len(vectors), batch_size):
                 self.index.upsert(vectors=vectors[i:i+batch_size])
@@ -88,18 +80,30 @@ class Retriever:
             print(f"❌ Upsert failed: {e}")
             raise
 
-    def search(self, query: str, top_k: int = 10) -> List[Dict]:
-        """
-        Search Pinecone for similar chunks.
-        Returns top_k results with text + metadata.
-        """
+    def search(
+        self,
+        query:    str,
+        top_k:    int = 10,
+        user_id:  Optional[int] = None,
+        filename: Optional[str] = None
+    ) -> List[Dict]:
         try:
             query_embedding = self.embedder.embed_text(query)
+
+            # Build filter dynamically
+            filter_dict = {}
+            if user_id is not None:
+                filter_dict["user_id"] = {"$eq": int(user_id)}  # always int
+            if filename is not None:
+                filter_dict["filename"] = {"$eq": filename}
+
+            print(f"🔍 Searching with filter: {filter_dict}")  # debug log
 
             results = self.index.query(
                 vector=query_embedding,
                 top_k=top_k,
-                include_metadata=True
+                include_metadata=True,
+                filter=filter_dict if filter_dict else None
             )
 
             matches = []
@@ -113,13 +117,13 @@ class Retriever:
                     "chunk":    match["metadata"].get("chunk", 0),
                 })
 
+            print(f"✅ Found {len(matches)} chunks for user_id={user_id}")  # debug log
             return matches
         except Exception as e:
             print(f"❌ Search failed: {e}")
             raise
 
     def delete_by_ids(self, ids: List[str]):
-        """Delete vectors by their IDs (when user deletes a doc)."""
         try:
             self.index.delete(ids=ids)
             print(f"🗑️ Deleted {len(ids)} vectors from Pinecone")
