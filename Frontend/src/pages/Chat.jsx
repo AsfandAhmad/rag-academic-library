@@ -39,7 +39,7 @@ export default function Chat() {
     setLoading(true);
 
     try {
-      const res = await askQuestion({ question: q });
+      const res = await askQuestion(q);
       const assistant = { 
         role: "assistant", 
         content: res.data.answer || "", 
