@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
- 
+from typing import Optional
+
 import json, time
 
 from db.database import get_db, QueryLog
@@ -14,8 +15,9 @@ router = APIRouter()
 
 class QueryRequest(BaseModel):
     question:      str
-    top_k_fetch:   int = 10   # fetch this many from Pinecone
-    top_k_rerank:  int = 5    # keep this many after re-ranking
+    top_k_fetch:   int = 10
+    top_k_rerank:  int = 5
+    filename:      Optional[str] = None  # optional: target a specific PDF
 
 class QueryResponse(BaseModel):
     query_id:      int
@@ -31,22 +33,19 @@ async def ask_question(
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db)
 ):
-    """
-    Full RAG pipeline:
-    1. Embed user query (SciBERT)
-    2. Retrieve top-k chunks from Pinecone
-    3. Re-rank with Cross-Encoder (SEER)
-    4. Generate answer with Groq LLM + citations
-    5. Log query to SQLite
-    """
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
     start_time = time.time()
 
-    # Step 1 + 2: Retrieve
-    retriever = get_retriever()
-    raw_chunks = retriever.search(request.question, top_k=request.top_k_fetch)
+    # Step 1 + 2: Retrieve — filtered to current user's docs only
+    retriever  = get_retriever()
+    raw_chunks = retriever.search(
+        request.question,
+        top_k=request.top_k_fetch,
+        user_id=current_user.id,      # ← only this user's PDFs
+        filename=request.filename      # ← optional specific PDF
+    )
 
     if not raw_chunks:
         raise HTTPException(
@@ -54,7 +53,7 @@ async def ask_question(
             detail="No relevant documents found. Please upload some PDFs first."
         )
 
-    # Step 3: Re-rank (SEER)
+    # Step 3: Re-rank
     reranker      = get_reranker()
     ranked_chunks = reranker.rerank(request.question, raw_chunks, top_k=request.top_k_rerank)
 
@@ -90,7 +89,6 @@ async def get_query_history(
     current_user: User = Depends(get_current_user),
     db:           AsyncSession = Depends(get_db)
 ):
-    """Get last 20 queries for the current user."""
     from sqlalchemy import select, desc
     result = await db.execute(
         select(QueryLog)
