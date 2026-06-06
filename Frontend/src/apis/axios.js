@@ -45,9 +45,7 @@ export const uploadPDF  = (file, category = "", description = "") => {
   fd.append("file", file);
   if (category) fd.append("category", category);
   if (description) fd.append("description", description);
-  return API.post("/upload/pdf", fd, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  return API.post("/upload/pdf", fd);
 };
 export const uploadPDFWithProgress = (file, onProgress, category = "", description = "") => {
   const fd = new FormData();
@@ -55,7 +53,6 @@ export const uploadPDFWithProgress = (file, onProgress, category = "", descripti
   if (category) fd.append("category", category);
   if (description) fd.append("description", description);
   return API.post("/upload/pdf", fd, {
-    headers: { "Content-Type": "multipart/form-data" },
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
         const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);

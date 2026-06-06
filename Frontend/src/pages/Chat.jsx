@@ -66,9 +66,7 @@ export default function Chat() {
     }
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      await uploadPDF(formData);
+      await uploadPDF(file);
       await fetchDocs();
       alert(`Uploaded: ${file.name}`);
     } catch (err) {
