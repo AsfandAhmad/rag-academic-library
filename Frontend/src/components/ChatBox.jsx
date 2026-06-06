@@ -1,95 +1,146 @@
-import { useState } from "react";
-import FeedbackBtn from "./FeedbackBtn";
-import { useTheme } from "../context/ThemeContext";
+import { useRef, useEffect } from 'react';
 
-export default function ChatBox({ message }) {
-  const isUser = message.role === "user";
-  const [expanded, setExpanded] = useState(false);
-  const { colors, isDark } = useTheme();
+export default function ChatBox({ 
+  selectedDoc, 
+  messages = [], 
+  input, 
+  setInput, 
+  onSend, 
+  isLoading 
+}) {
+  const bottomRef = useRef(null);
+  const textareaRef = useRef(null);
 
-  const styles = {
-    wrapper: { display: "flex", alignItems: "flex-start", gap: 10, justifyContent: isUser ? "flex-end" : "flex-start" },
-    avatar: { fontSize: 28, flexShrink: 0, marginTop: 4 },
-    userAvatar: { fontSize: 28, flexShrink: 0, marginTop: 4 },
-    bubble: { 
-      borderRadius: 14, 
-      padding: "12px 16px",
-      boxShadow: isDark ? "none" : "0 2px 4px rgba(0,0,0,0.08)"
-    },
-    userBubble: { background: colors.primary },
-    aiBubble: { background: colors.bgSecondary, border: `1px solid ${colors.border}` },
-    text: { margin: 0, fontSize: 14, lineHeight: 1.6, color: isUser ? "#fff" : colors.text, whiteSpace: "pre-wrap" },
-    meta: { margin: "8px 0 0", fontSize: 11, color: colors.textTertiary },
-    sourcesRow: { marginTop: 8 },
-    toggleBtn: { 
-      background: "transparent", 
-      border: `1px solid ${colors.border}`, 
-      borderRadius: 6, 
-      color: colors.textSecondary, 
-      fontSize: 12, 
-      cursor: "pointer", 
-      padding: "4px 10px",
-      transition: "all 0.2s ease"
-    },
-    sourcesList: { marginTop: 8, display: "flex", flexDirection: "column", gap: 8 },
-    sourceItem: { 
-      display: "flex", 
-      gap: 10, 
-      background: colors.bg, 
-      borderRadius: 8, 
-      padding: "10px 12px", 
-      border: `1px solid ${colors.border}`,
-      boxShadow: isDark ? "none" : "0 1px 3px rgba(0,0,0,0.05)"
-    },
-    sourceNum: { color: colors.primary, fontWeight: 700, flexShrink: 0, fontSize: 13 },
-    sourceName: { margin: 0, fontSize: 13, fontWeight: 600, color: colors.text },
-    sourceMeta: { margin: "2px 0", fontSize: 11, color: colors.textTertiary },
-    sourceExcerpt: { margin: 0, fontSize: 12, color: colors.textSecondary, fontStyle: "italic" },
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      onSend();
+    }
+  };
+
+  const quickPrompts = [
+    "Summarise this document",
+    "What are the key concepts?",
+    "List all topics covered",
+    "Explain chapter 1",
+    "Compare the main arguments"
+  ];
+
+  const handleQuickPrompt = (prompt) => {
+    setInput(prompt);
+    textareaRef.current?.focus();
   };
 
   return (
-    <div style={styles.wrapper}>
-      {!isUser && <span style={styles.avatar}>🤖</span>}
-
-      <div style={{ maxWidth: "70%" }}>
-        <div style={{ ...styles.bubble, ...(isUser ? styles.userBubble : styles.aiBubble) }}>
-          <p style={styles.text}>{message.content}</p>
-
-          {/* Response time */}
-          {message.response_time && <p style={styles.meta}>⚡ {message.response_time}s response time</p>}
+    <div className="mk-chatbox">
+      {/* Chat Header */}
+      <div className="chat-header">
+        <div>
+          <h2 className="chat-title">Chat with the Archive</h2>
+          <p className="chat-subtitle">Ask questions about your documents</p>
         </div>
-
-        {/* Sources toggle */}
-        {!isUser && message.sources?.length > 0 && (
-          <div style={styles.sourcesRow}>
-            <button style={styles.toggleBtn} onClick={() => setExpanded(!expanded)}>
-              📎 {message.sources.length} source{message.sources.length > 1 ? "s" : ""} {expanded ? "▲" : "▼"}
-            </button>
-
-            {expanded && (
-              <div style={styles.sourcesList}>
-                {message.sources.map((src, i) => (
-                  <div key={i} style={styles.sourceItem}>
-                    <span style={styles.sourceNum}>[{src.index}]</span>
-                    <div>
-                      <p style={styles.sourceName}>📄 {src.filename}</p>
-                      <p style={styles.sourceMeta}>
-                        Page {src.page} · Score: {src.score}
-                      </p>
-                      <p style={styles.sourceExcerpt}>{src.excerpt}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Feedback */}
-            {message.query_id && <FeedbackBtn queryId={message.query_id} />}
-          </div>
-        )}
+        <div className="chat-actions">
+          <button className="btn-secondary">Clear Chat</button>
+        </div>
       </div>
 
-      {isUser && <span style={styles.userAvatar}>👤</span>}
+      {/* Messages Area */}
+      <div className="chat-messages">
+        {messages.length === 0 ? (
+          // Welcome State
+          <div className="welcome-state">
+            <div className="lantern-wrap">
+              <div className="lantern-top"></div>
+              <div className="lantern-body">
+                <div className="flame"></div>
+              </div>
+            </div>
+            <h3 className="welcome-title">Welcome to Maktab e Kamil</h3>
+            <p className="welcome-text">
+              The Archive awaits your inquiry. Every answer is drawn from your documents,
+              with citations to source and page.
+            </p>
+            <div className="quick-prompts">
+              <div className="prompts-label">Quick Prompts</div>
+              {quickPrompts.map((prompt, i) => (
+                <button 
+                  key={i}
+                  className="prompt-chip"
+                  onClick={() => handleQuickPrompt(prompt)}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          // Messages
+          messages.map((msg, idx) => (
+            <div 
+              key={idx} 
+              className={`message ${msg.role === 'assistant' ? 'ai' : 'user'}`}
+            >
+              <div className="message-avatar">
+                {msg.role === 'assistant' ? '📚' : '👤'}
+              </div>
+              <div className="message-content">
+                <div className="message-role">
+                  {msg.role === 'assistant' ? 'Archive' : 'You'}
+                </div>
+                <div className="message-text">{msg.content}</div>
+                {msg.response_time && (
+                  <div className="message-meta">
+                    ⚡ {msg.response_time}s response time
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Document Context Bar */}
+      {selectedDoc && (
+        <div className="context-bar">
+          <span className="context-icon">📄</span>
+          <span className="context-text">
+            Asking about: <strong>{selectedDoc.filename}</strong>
+          </span>
+          <button className="context-clear">×</button>
+        </div>
+      )}
+
+      {/* Input Area */}
+      <div className="chat-input-area">
+        <p className="input-notice">
+          Answers are generated only from your uploaded documents. 
+          Every response cites its source file and page.
+        </p>
+        
+        <div className="input-container">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask the archive..."
+            className="chat-textarea"
+            disabled={isLoading}
+          />
+          <button 
+            className="send-btn" 
+            onClick={onSend}
+            disabled={isLoading || !input.trim()}
+          >
+            {isLoading ? '...' : '➤'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

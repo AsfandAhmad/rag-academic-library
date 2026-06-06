@@ -161,7 +161,7 @@ why i cant see anything on UI there is nothing on UI when i opened the page
 All API endpoints tested and working:
 
 ```bash
-=== Testing RAG Academic Library API ===
+=== Testing Maktab e Kamil API ===
 
 1. Testing Health Endpoint...
 ✓ Health check passed

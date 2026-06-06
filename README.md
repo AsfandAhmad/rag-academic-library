@@ -1,4 +1,4 @@
-# 📚 RAG Academic Library System
+# 📚 Maktab e Kamil System
 
 A full-stack **Retrieval-Augmented Generation (RAG)** system for academic document search and question answering. Built with FastAPI, React, Pinecone, and Groq LLM.
 

@@ -1,4 +1,4 @@
-# 📋 Project Summary - RAG Academic Library
+# 📋 Project Summary - Maktab e Kamil
 
 ## ✅ Completed Features
 

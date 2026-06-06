@@ -6,7 +6,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta
-from typing import Optional
+
 import os
 
 from db.database import get_db, User, UserRole

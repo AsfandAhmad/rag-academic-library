@@ -41,25 +41,25 @@ class Generator:
         context = "\n".join(context_parts)
 
         prompt = f"""You are an academic research assistant for a university library system.
-Your task is to answer the user's question using ONLY the provided academic sources below.
+    Your task is to answer the user's question using ONLY the provided academic sources below.
 
-RULES:
-1. Answer clearly and accurately based on the sources.
-2. Always cite your sources using [Source N] notation inline.
-3. At the end, list all sources used in this format:
-   References:
-   [Source N] filename, Page X
-4. If the sources don't contain enough information, say so honestly.
-5. Do not hallucinate or add information not in the sources.
-6. Maintain academic rigor in your response.
+    RULES:
+    1. Answer clearly and accurately based on the sources.
+    2. Always cite your sources using [Source N] notation inline.
+    3. At the end, list all sources used in this format:
+       References:
+       [Source N] filename, Page X
+    4. If the retrieved documents do not contain enough information to answer the question, respond with exactly: 'I could not find relevant information in the uploaded documents to answer this question.'
+    5. Do not hallucinate or add information not in the sources.
+    6. Maintain academic rigor in your response.
 
-ACADEMIC SOURCES:
-{context}
+    ACADEMIC SOURCES:
+    {context}
 
-USER QUESTION:
-{query}
+    USER QUESTION:
+    {query}
 
-ANSWER:"""
+    ANSWER:"""
 
         return prompt
 
@@ -91,16 +91,35 @@ ANSWER:"""
 
             answer = response.choices[0].message.content
 
-            # Build sources list for frontend
+            # Build sources list for frontend; ensure score is normalized 0-1 and rounded to 2 decimals
             sources = []
             for i, chunk in enumerate(chunks, 1):
+                raw_score = chunk.get("rerank_score", chunk.get("score", 0))
+                try:
+                    score_val = float(raw_score)
+                except Exception:
+                    score_val = 0.0
+
+                # If score appears to be >1 (percentage style), normalize
+                if score_val > 1:
+                    score_val = min(max(score_val / 100.0, 0.0), 1.0)
+                else:
+                    score_val = min(max(score_val, 0.0), 1.0)
+
                 sources.append({
                     "index":    i,
                     "filename": chunk["filename"],
                     "page":     chunk["page"],
-                    "score":    round(chunk.get("rerank_score", chunk.get("score", 0)), 4),
+                    "score":    round(score_val, 2),
+                    "rerank_score": float(chunk.get("rerank_score") or 0.0),
+                    "embedding_score": float(chunk.get("score") or 0.0),
                     "excerpt":  chunk["text"][:200] + "..."  # first 200 chars
                 })
+
+            # If model returned the explicit fallback sentence, suppress sources
+            fallback_phrase = "i could not find relevant information in the uploaded documents to answer this question"
+            if isinstance(answer, str) and fallback_phrase in answer.lower():
+                sources = []
 
             return {
                 "answer":  answer,

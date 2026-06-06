@@ -21,8 +21,8 @@ async def lifespan(app: FastAPI):
     print("👋 Shutting down...")
 
 app = FastAPI(
-    title="RAG Academic Library API",
-    description="Retrieval Augmented Generation for Academic Library Search",
+    title="Maktab e Kamil API",
+    description="Retrieval Augmented Generation for Maktab e Kamil",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -45,7 +45,7 @@ app.include_router(feedback.router, prefix="/feedback", tags=["Feedback"])
 @app.get("/")
 async def root():
     return {
-        "message": "RAG Academic Library API is running",
+        "message": "Maktab e Kamil API is running",
         "docs": "/docs"
     }
 

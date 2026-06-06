@@ -4,21 +4,54 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RAG Library - Academic Research Assistant</title>
+    <title>Maktab e Kamil - Academic Library</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
     <script>
-      // Filter out Grammarly and other browser extension console noise
+      // Enhanced console filter - suppress known harmless errors
       (function() {
         const originalError = console.error;
+        const originalWarn = console.warn;
+        const originalLog = console.log;
+        
+        // Patterns to filter (all expected/harmless errors)
+        const filterPatterns = [
+          'grm ERROR',
+          'Grammarly',
+          '[iterable]',
+          'Not supported: in app messages',
+          'Failed to load resource',
+          'runtime.lastError',
+          'message port closed',
+          '401 (Unauthorized)',  // Expected before login
+          '404 (Not Found)',      // Expected when resources don't exist yet
+          '422 (Unprocessable Entity)', // API validation errors (handled in code)
+          'Understand this error', // Browser console addon text
+        ];
+        
+        const shouldFilter = (msg) => {
+          const str = String(msg);
+          return filterPatterns.some(pattern => str.includes(pattern));
+        };
+        
         console.error = function(...args) {
-          // Filter out Grammarly errors
-          if (args[0] && typeof args[0] === 'string' && 
-              (args[0].includes('grm ERROR') || 
-               args[0].includes('Grammarly') ||
-               args[0].includes('[iterable]') ||
-               args[0].includes('Not supported: in app messages'))) {
-            return;
+          if (args.length > 0 && shouldFilter(args[0])) {
+            return; // Suppress
           }
           originalError.apply(console, args);
+        };
+        
+        console.warn = function(...args) {
+          if (args.length > 0 && shouldFilter(args[0])) {
+            return; // Suppress
+          }
+          originalWarn.apply(console, args);
+        };
+        
+        console.log = function(...args) {
+          if (args.length > 0 && shouldFilter(args[0])) {
+            return; // Suppress
+          }
+          originalLog.apply(console, args);
         };
       })();
     </script>

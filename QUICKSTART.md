@@ -1,6 +1,6 @@
 # 🚀 Quick Start Guide
 
-Get the RAG Academic Library running in 5 minutes!
+Get Maktab e Kamil running in 5 minutes!
 
 ---
 

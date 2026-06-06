@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login  from "./src/pages/Login";
+import LoginNew from "./src/pages/LoginNew";
 import Upload from "./src/pages/Upload";
 import Chat   from "./src/pages/Chat";
+import { ThemeProvider } from "./src/context/ThemeContext";
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem("token");
@@ -10,13 +11,15 @@ const PrivateRoute = ({ children }) => {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login"  element={<Login />} />
-        <Route path="/upload" element={<PrivateRoute><Upload /></PrivateRoute>} />
-        <Route path="/chat"   element={<PrivateRoute><Chat /></PrivateRoute>} />
-        <Route path="*"       element={<Navigate to="/login" />} />
-      </Routes>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login"  element={<LoginNew />} />
+          <Route path="/upload" element={<PrivateRoute><Upload /></PrivateRoute>} />
+          <Route path="/chat"   element={<PrivateRoute><Chat /></PrivateRoute>} />
+          <Route path="*"       element={<Navigate to="/login" />} />
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

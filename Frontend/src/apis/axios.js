@@ -40,15 +40,38 @@ export const loginUser     = (email, password) => {
 export const getMe = () => API.get("/auth/me");
 
 // ─── Upload ───────────────────────────────────────────────
-export const uploadPDF  = (file) => {
+export const uploadPDF  = (file, category = "", description = "") => {
   const fd = new FormData();
   fd.append("file", file);
+  if (category) fd.append("category", category);
+  if (description) fd.append("description", description);
   return API.post("/upload/pdf", fd, {
     headers: { "Content-Type": "multipart/form-data" },
   });
 };
+export const uploadPDFWithProgress = (file, onProgress, category = "", description = "") => {
+  const fd = new FormData();
+  fd.append("file", file);
+  if (category) fd.append("category", category);
+  if (description) fd.append("description", description);
+  return API.post("/upload/pdf", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+    onUploadProgress: (progressEvent) => {
+      if (onProgress && progressEvent.total) {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percent);
+      }
+    }
+  });
+};
 export const getMyDocs  = () => API.get("/upload/my-docs");
 export const deleteDoc  = (id) => API.delete(`/upload/${id}`);
+export const getDocPreview = (id) => API.get(`/upload/${id}/preview`);
+export const toggleFavorite = (id) => API.post(`/upload/${id}/favorite`);
+export const getStats = () => API.get("/upload/stats");
+export const getDocs = () => API.get("/upload/docs");
+export const deleteDocById = (id) => API.delete(`/upload/docs/${id}`);
+export const getAllDocs = () => API.get("/upload/docs/all");
 
 // ─── Query ────────────────────────────────────────────────
 export const askQuestion   = (question) =>
